@@ -1,1 +1,472 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Masjid — Website + Panel DKM (Realtime)</title>
+  <style>
+    /* ---------- Reset & variables ---------- */
+    :root{--bg:#f6f8fb;--card:#fff;--muted:#6b7280;--accent:#0f766e;--accent-2:#035f5e;--glass: rgba(255,255,255,0.6);--radius:12px;--shadow: 0 6px 18px rgba(11,15,25,0.08);--soft: 14px}
+    *{box-sizing:border-box}
+    html,body{height:100%;margin:0;font-family:Poppins, Inter, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial; background:linear-gradient(180deg,#f3fbfb 0%,var(--bg) 100%);color:#0b1220}
+    a{color:var(--accent)}
+    header{display:flex;align-items:center;justify-content:space-between;padding:18px 20px;background:linear-gradient(90deg,#ffffffcc, #f8fbffcc);backdrop-filter: blur(6px);box-shadow:var(--shadow);position:sticky;top:0;z-index:50}
+    .brand{display:flex;align-items:center;gap:12px}
+    .brand img{width:52px;height:52px;border-radius:10px;object-fit:cover}
+    nav{display:flex;gap:12px;align-items:center}
+    nav a{padding:8px 12px;border-radius:8px;font-weight:600;text-decoration:none}
+    .hero{display:grid;grid-template-columns:1fr 380px;gap:28px;align-items:center;padding:28px;max-width:1200px;margin:18px auto}
+    .card{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);padding:18px}
+    .welcome h1{margin:0;font-size:28px}
+    .welcome p{color:var(--muted);margin-top:8px}
+    .pray-times{display:flex;flex-direction:column;gap:8px}
+    .time-row{display:flex;justify-content:space-between;padding:8px 10px;border-radius:8px;background:linear-gradient(90deg,#f8fdfb, #ffffff);align-items:center}
+    .events{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
+    .event{padding:12px;border-radius:10px}
+    .gallery{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px}
+    .gallery img{width:100%;height:100px;object-fit:cover;border-radius:8px}
+    .admin-panel{position:fixed;right:18px;bottom:18px;z-index:200}
+    .admin-panel button{background:var(--accent);color:white;border:none;padding:12px 14px;border-radius:12px;cursor:pointer;box-shadow:0 8px 20px rgba(2,6,23,0.12)}
+    .modal-backdrop{position:fixed;inset:0;background:rgba(6,6,7,0.36);display:none;align-items:center;justify-content:center;z-index:300}
+    .modal{width:900px;max-width:96%;max-height:92vh;overflow:auto;padding:18px;border-radius:12px;background:var(--card)}
+    label{display:block;margin-top:12px;font-size:13px;color:var(--muted)}
+    input[type=text],textarea,select{width:100%;padding:10px;border-radius:8px;border:1px solid #e6eef3;margin-top:6px}
+    .row{display:flex;gap:12px}
+    @media (max-width:880px){.hero{grid-template-columns:1fr}nav{display:none}header{padding:14px}.brand img{width:44px;height:44px}}
+    .fade-in{opacity:0;transform:translateY(8px);transition:all .6s cubic-bezier(.2,.9,.2,1)}.in-view{opacity:1;transform:none}
+    footer{max-width:1200px;margin:18px auto;padding:18px;text-align:center;color:var(--muted)}
+    table{width:100%;border-collapse:collapse}th,td{padding:8px;text-align:left;border-bottom:1px solid #eef3f6}.btn{display:inline-block;padding:8px 12px;border-radius:8px;background:var(--accent);color:#fff;text-decoration:none}
+    .donate{display:flex;flex-direction:column;gap:8px}
+    /* small helper */
+    .muted{color:var(--muted);font-size:13px}
+    .auth-btn{background:#fff;border:1px solid #eef6f6;padding:8px 12px;border-radius:8px;cursor:pointer}
+  </style>
+</head>
+<body>
+  <header class="card" role="banner">
+    <div class="brand">
+      <img id="logo" src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='80' height='80'><rect width='100%' height='100%' rx='12' fill='%230f766e'/><text x='50%' y='55%' font-size='26' fill='white' text-anchor='middle' font-family='Poppins, Arial' font-weight='700'>M</text></svg>" alt="logo">
+      <div>
+        <div id="mosqueName" style="font-weight:700">Masjid Al-Ikhlas</div>
+        <div id="mosqueTag" style="color:var(--muted);font-size:13px">Selalu Berjamaah, Selalu Berdonasi</div>
+      </div>
+    </div>
+    <nav aria-label="Main navigation">
+      <a href="#home">Beranda</a>
+      <a href="#jadwal">Jadwal Sholat</a>
+      <a href="#kegiatan">Kegiatan</a>
+      <a href="#galeri">Galeri</a>
+      <a href="#kontak">Kontak</a>
+    </nav>
+    <div style="display:flex;gap:10px;align-items:center">
+      <div id="authArea">
+        <button id="loginBtn" class="auth-btn">Login DKM</button>
+      </div>
+      <button class="btn" id="donateBtn">Donasi</button>
+      <div style="font-size:13px;color:var(--muted)">Hari ini: <span id="todayDate">-</span></div>
+    </div>
+  </header>
+
+  <main style="max-width:1200px;margin:18px auto;padding:0 12px">
+    <section class="hero">
+      <div class="card welcome fade-in">
+        <h1 id="heroTitle">Selamat Datang di Masjid Al-Ikhlas</h1>
+        <p id="heroSubtitle">Gotong royong, ibadah, dan kegiatan sosial untuk masyarakat sekitar.</p>
+        <div style="display:flex;gap:12px;margin-top:14px">
+          <a class="btn" href="#kegiatan">Lihat Kegiatan</a>
+          <a class="btn" id="openPanel" style="background:var(--accent-2)">Panel DKM</a>
+        </div>
+        <hr style="margin:14px 0;border:none;border-top:1px solid #eef6f6">
+        <h3>Pengumuman</h3>
+        <ul id="announcements"></ul>
+        <h3 style="margin-top:12px">Video Terbaru</h3>
+        <div style="margin-top:8px">
+          <video id="videoPlayer" controls width="100%" style="border-radius:10px;background:#000">
+            <source id="videoSource" src="" type="video/mp4">
+            Video tidak didukung.
+          </video>
+        </div>
+      </div>
+
+      <aside class="card fade-in" style="height:100%">
+        <h3>Jadwal Sholat</h3>
+        <div class="pray-times" id="prayTimes"></div>
+        <hr style="margin:12px 0;border:none;border-top:1px solid #f0f6f6">
+        <div class="donate">
+          <strong>Donasi</strong>
+          <div class="muted">Bantu kegiatan masjid & sosial</div>
+          <div style="display:flex;gap:8px;margin-top:10px">
+            <input id="donationAmount" type="text" placeholder="Jumlah (Rp)" />
+            <button id="donateNow" class="btn">Donasi</button>
+          </div>
+        </div>
+      </aside>
+    </section>
+
+    <section id="kegiatan" class="card fade-in" style="margin-top:16px;padding:14px">
+      <h3>Kegiatan Mendatang</h3>
+      <div class="events" id="eventsList"></div>
+    </section>
+
+    <section id="galeri" class="card fade-in" style="margin-top:16px;padding:14px">
+      <h3>Galeri Foto</h3>
+      <div class="gallery" id="gallery"></div>
+    </section>
+
+    <section id="kontak" class="card fade-in" style="margin-top:16px;padding:14px">
+      <h3>Kontak & Lokasi</h3>
+      <p id="address">Jl. Contoh No.1 — Kota</p>
+      <div style="height:260px;border-radius:10px;overflow:hidden;margin-top:8px">
+        <iframe id="mapFrame" src="https://www.google.com/maps?q=Jakarta&output=embed" style="width:100%;height:100%;border:0"></iframe>
+      </div>
+    </section>
+
+  </main>
+  <footer>
+    &copy; <span id="year">2025</span> <span id="mosqueFooter">Masjid Al-Ikhlas</span> — Dikelola oleh DKM
+  </footer>
+
+  <!-- floating admin button -->
+  <div class="admin-panel">
+    <button id="openAdmin">DKM Panel</button>
+  </div>
+
+  <!-- Modal for Admin -->
+  <div id="modalBackdrop" class="modal-backdrop" role="dialog" aria-hidden="true">
+    <div class="modal card" role="document">
+      <h2>Panel DKM — Kontrol Website</h2>
+      <p class="muted" style="margin-top:0">Perubahan dipublish ke Firestore (realtime). Jika belum dikonfigurasi, jatuhkan ke LocalStorage (demo).</p>
+
+      <label>Nama Masjid</label>
+      <input id="inpName" type="text" />
+      <label>Tagline</label>
+      <input id="inpTag" type="text" />
+      <label>Pengumuman (pisahkan baris)</label>
+      <textarea id="inpAnn" rows="4"></textarea>
+      <label>Video sumber (URL mp4)</label>
+      <input id="inpVideo" type="text" />
+      <label>Alamat</label>
+      <input id="inpAddress" type="text" />
+
+      <div style="display:flex;gap:10px;margin-top:12px;flex-wrap:wrap">
+        <button id="saveBtn" class="btn">Simpan & Publikasikan</button>
+        <button id="closeBtn" style="background:#e6eef3;border:none;padding:8px 12px;border-radius:8px">Tutup</button>
+        <button id="resetBtn" style="background:#fff;border:1px solid #eef6f6;padding:8px 12px;border-radius:8px">Reset ke demo</button>
+      </div>
+
+      <hr style="margin:12px 0;border:none;border-top:1px solid #eef6f6">
+      <h3>Kelola Kegiatan (5 terbaru)</h3>
+      <div id="eventsEditor"></div>
+
+      <h3 style="margin-top:12px">Galeri (satu URL per baris)</h3>
+      <textarea id="inpGallery" rows="4" placeholder="Satu URL per baris"></textarea>
+
+      <h3 style="margin-top:12px">Pengaturan Realtime & Auth</h3>
+      <p class="muted">Pada demo ini Anda dapat aktifkan <strong>Firestore Realtime</strong> jika memiliki project Firebase. Masukkan konfigurasi Firebase di bagian <em>FIREBASE_CONFIG</em> di bawah kode. Jika tidak, sistem akan fallback ke localStorage.</p>
+
+      <div style="margin-top:8px">
+        <button id="logoutBtn" class="auth-btn">Logout DKM</button>
+      </div>
+
+      <p class="muted" style="margin-top:12px">Petunjuk deploy & server Socket.io ada di akhir file (komentar).</p>
+    </div>
+  </div>
+
+  <!-- Auth modal -->
+  <div id="authBackdrop" class="modal-backdrop" style="display:none;align-items:center;justify-content:center;z-index:400">
+    <div class="modal card" style="max-width:420px;">
+      <h3 id="authTitle">Login DKM</h3>
+      <label>Email</label><input id="authEmail" type="text" />
+      <label>Password</label><input id="authPass" type="password" />
+      <div style="display:flex;gap:8px;margin-top:12px"><button id="authLogin" class="btn">Login</button><button id="authClose" class="auth-btn">Batal</button></div>
+      <p class="muted" style="margin-top:12px">(Demo menggunakan Firebase Auth — aktifkan di project Anda.)</p>
+    </div>
+  </div>
+
+  <!-- Firebase SDKs & App logic -->
+  <script>
+// Firebase Config Injected
+const firebaseConfig = {
+  apiKey: "AIzaSyDVnSxo-PfRzEihhwyQnqgC_ZuE3f-md5M",
+  authDomain: "masjid-baiturrahman-cilangkap.firebaseapp.com",
+  projectId: "masjid-baiturrahman-cilangkap",
+  storageBucket: "masjid-baiturrahman-cilangkap.appspot.com",
+  messagingSenderId: "95283271060",
+  appId: "1:95283271060:web:08ff7cc33c9e1fce70eb81",
+  measurementId: "G-LEDR3D1QFE"
+};
+    /* ================= CONFIGURATION ==================
+       - Jika ingin realtime: buat project Firebase, aktifkan Firestore & Auth.
+       - Isi object FIREBASE_CONFIG di bawah dengan credentials Anda.
+       - Jika tidak ingin Firestore, biarkan FIREBASE_CONFIG = null dan sistem pakai localStorage.
+    */
+
+    const FIREBASE_CONFIG = null;
+    /* contoh format:
+    const FIREBASE_CONFIG = {
+      apiKey: "AAA...",
+      authDomain: "your-project.firebaseapp.com",
+      projectId: "your-project",
+      storageBucket: "your-project.appspot.com",
+      messagingSenderId: "...",
+      appId: "1:...:web:..."
+    };
+    */
+
+    // demo fallback data
+    const demoData = {
+      mosqueName: 'Masjid Al-Ikhlas',
+      mosqueTag: 'Selalu Berjamaah, Selalu Berdonasi',
+      announcements: ['Kajian Jum\'at setelah Maghrib minggu ini: Tema Sedekah','Donasi Pembangunan Aula: Rp 25.000.000 terkumpul'],
+      video: '',
+      address: 'Jl. Contoh No.1, Kecamatan, Kota',
+      events: [{title:'Pengajian Rutin', date:'2025-11-25', desc:'Pengajian umum oleh Ustadz Ahmad'},{title:'Bakti Sosial', date:'2025-12-05', desc:'Baksos dan pembagian sembako'}],
+      gallery: ['https://picsum.photos/seed/1/800/600','https://picsum.photos/seed/2/800/600','https://picsum.photos/seed/3/800/600'],
+      prayerTimes: {Fajr:'04:25',Dhuhr:'11:58',Asr:'15:12',Maghrib:'17:30',Isha:'18:45'}
+    };
+
+    // runtime objects
+    let useFirestore = false;
+    let firebaseApp = null;
+    let firestore = null;
+    let auth = null;
+    const SITE_DOC = 'site/masjid_main'; // Firestore document path
+
+    // helpers for storage abstraction
+    async function loadData(){
+      if(useFirestore){
+        try{
+          const snap = await firestore.doc('site/masjid_main').get();
+          if(snap.exists) return snap.data();
+          await firestore.doc('site/masjid_main').set(demoData);
+          return demoData;
+        }catch(e){console.warn('Firestore load error',e); return demoData}
+      }else{
+        const raw = localStorage.getItem('masjid_site');
+        return raw ? JSON.parse(raw) : demoData;
+      }
+    }
+
+    async function saveData(obj){
+      if(useFirestore){
+        await firestore.doc('site/masjid_main').set(obj);
+      }else{
+        localStorage.setItem('masjid_site', JSON.stringify(obj));
+        window.dispatchEvent(new Event('siteUpdated'));
+      }
+    }
+
+    /* ================== Initialize Firebase (optional) ================== */
+    async function initFirebase(){
+      if(!FIREBASE_CONFIG) return false;
+      // load SDKs dynamically
+      await loadScript('https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js');
+      await loadScript('https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js');
+      await loadScript('https://www.gstatic.com/firebasejs/9.22.1/firebase-auth-compat.js');
+      // init
+      firebaseApp = firebase.initializeApp(FIREBASE_CONFIG);
+      firestore = firebase.firestore();
+      auth = firebase.auth();
+      useFirestore = true;
+
+      // realtime listener
+      firestore.doc('site/masjid_main').onSnapshot((snap)=>{
+        if(!snap.exists) return; renderAllFromData(snap.data());
+      });
+
+      // auth listener
+      auth.onAuthStateChanged(user=>{
+        updateAuthUI(user);
+      });
+      return true;
+    }
+
+    function loadScript(src){
+      return new Promise((res,rej)=>{
+        const s=document.createElement('script');s.src=src;s.onload=res;s.onerror=rej;document.head.appendChild(s);
+      });
+    }
+
+    /* ================== Rendering ================== */
+    async function renderAll(){
+      const data = await loadData();
+      renderAllFromData(data);
+    }
+
+    function renderAllFromData(data){
+      document.getElementById('mosqueName').textContent = data.mosqueName;
+      document.getElementById('mosqueFooter').textContent = data.mosqueName;
+      document.getElementById('mosqueTag').textContent = data.mosqueTag;
+      document.getElementById('heroTitle').textContent = data.mosqueName;
+      document.getElementById('heroSubtitle').textContent = data.mosqueTag;
+      document.getElementById('address').textContent = data.address;
+      document.getElementById('videoSource').src = data.video || '';
+      const vp = document.getElementById('videoPlayer'); vp.load();
+      const ann = document.getElementById('announcements'); ann.innerHTML = '';
+      (data.announcements || []).forEach(a=>{const li=document.createElement('li');li.textContent=a;ann.appendChild(li)});
+      const pt = document.getElementById('prayTimes'); pt.innerHTML='';
+      for(const [k,v] of Object.entries(data.prayerTimes||{})){
+        const row = document.createElement('div'); row.className='time-row'; row.innerHTML = `<strong>${k}</strong><span>${v}</span>`; pt.appendChild(row);
+      }
+      const ev = document.getElementById('eventsList'); ev.innerHTML='';
+      (data.events||[]).forEach(e=>{const c = document.createElement('div'); c.className='event card'; c.innerHTML = `<h4 style="margin:0">${e.title}</h4><div class="muted">${e.date || ''}</div><p style="margin-top:8px;color:var(--muted)}">${e.desc || ''}</p>`; ev.appendChild(c);});
+      const gal = document.getElementById('gallery'); gal.innerHTML=''; (data.gallery||[]).forEach(url=>{const i=document.createElement('img');i.src=url;gal.appendChild(i)});
+      document.getElementById('todayDate').textContent = new Date().toLocaleDateString('id-ID',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+    }
+
+    /* ================= Admin interactions & Auth UI ================= */
+    const modal = document.getElementById('modalBackdrop');
+    document.getElementById('openAdmin').addEventListener('click', ()=>openPanel());
+    document.getElementById('openPanel').addEventListener('click', ()=>openPanel());
+    document.getElementById('closeBtn').addEventListener('click', ()=>closePanel());
+    document.getElementById('resetBtn').addEventListener('click', ()=>{localStorage.removeItem('masjid_site');renderAll();fillForm();});
+
+    function openPanel(){
+      // require login in Firestore mode
+      if(useFirestore && (!auth || !auth.currentUser)){
+        openAuth(); return;
+      }
+      fillForm(); modal.style.display='flex'; modal.setAttribute('aria-hidden','false');
+    }
+    function closePanel(){ modal.style.display='none'; modal.setAttribute('aria-hidden','true'); }
+
+    async function fillForm(){
+      const d = await loadData();
+      document.getElementById('inpName').value = d.mosqueName || '';
+      document.getElementById('inpTag').value = d.mosqueTag || '';
+      document.getElementById('inpAnn').value = (d.announcements||[]).join('\n');
+      document.getElementById('inpVideo').value = d.video || '';
+      document.getElementById('inpAddress').value = d.address || '';
+      document.getElementById('inpGallery').value = (d.gallery||[]).join('\n');
+
+      const evt = document.getElementById('eventsEditor'); evt.innerHTML='';
+      (d.events||[]).slice(0,5).forEach((e,idx)=>{
+        const wrapper = document.createElement('div'); wrapper.style.border='1px dashed #eef6f6'; wrapper.style.padding='8px'; wrapper.style.marginTop='8px';
+        wrapper.innerHTML = `
+          <label>Judul</label><input data-idx="${idx}" class="evTitle" type="text" value="${e.title}" />
+          <label>Tanggal</label><input data-idx="${idx}" class="evDate" type="text" value="${e.date}" />
+          <label>Deskripsi</label><input data-idx="${idx}" class="evDesc" type="text" value="${e.desc}" />
+        `;
+        evt.appendChild(wrapper);
+      });
+    }
+
+    document.getElementById('saveBtn').addEventListener('click', async ()=>{
+      const d = await loadData();
+      d.mosqueName = document.getElementById('inpName').value || d.mosqueName;
+      d.mosqueTag = document.getElementById('inpTag').value || d.mosqueTag;
+      d.announcements = document.getElementById('inpAnn').value.split('\n').map(s=>s.trim()).filter(Boolean);
+      d.video = document.getElementById('inpVideo').value.trim();
+      d.address = document.getElementById('inpAddress').value.trim();
+      d.gallery = document.getElementById('inpGallery').value.split('\n').map(s=>s.trim()).filter(Boolean);
+      const titles = Array.from(document.getElementsByClassName('evTitle')).map(i=>i.value);
+      const dates = Array.from(document.getElementsByClassName('evDate')).map(i=>i.value);
+      const descs = Array.from(document.getElementsByClassName('evDesc')).map(i=>i.value);
+      d.events = titles.map((t,i)=>({title:t,date:dates[i],desc:descs[i]})).filter(e=>e.title);
+      await saveData(d); renderAll(); closePanel();
+      alert('Perubahan berhasil dipublikasikan');
+    });
+
+    // Admin open login
+    document.getElementById('loginBtn').addEventListener('click', ()=>openAuth());
+    document.getElementById('authClose').addEventListener('click', ()=>closeAuth());
+    document.getElementById('authLogin').addEventListener('click', async ()=>{
+      if(!auth) return alert('Firebase belum dikonfigurasi');
+      const email = document.getElementById('authEmail').value; const pass = document.getElementById('authPass').value;
+      try{ await auth.signInWithEmailAndPassword(email,pass); closeAuth(); alert('Login sukses'); }catch(e){alert('Login gagal: '+e.message)}
+    });
+    document.getElementById('logoutBtn').addEventListener('click', async ()=>{ if(auth) await auth.signOut(); updateAuthUI(null); });
+
+    function openAuth(){ document.getElementById('authBackdrop').style.display='flex'; }
+    function closeAuth(){ document.getElementById('authBackdrop').style.display='none'; }
+
+    function updateAuthUI(user){ const area = document.getElementById('authArea'); if(user){ area.innerHTML = `<span class="muted">${user.email}</span> <button id=\"btnLogoutTop\" class=\"auth-btn\">Logout</button>`; document.getElementById('btnLogoutTop').addEventListener('click', ()=>auth.signOut()); }else{ area.innerHTML = `<button id=\"loginBtnTop\" class=\"auth-btn\">Login DKM</button>`; document.getElementById('loginBtnTop').addEventListener('click', ()=>openAuth()); } }
+
+    // listen to storage change (another tab) when not using Firestore
+    window.addEventListener('storage', function(e){ if(!useFirestore) renderAll(); });
+
+    /* ================== Init ================== */
+    (async function init(){
+      if(FIREBASE_CONFIG){
+        try{ await initFirebase(); console.log('Firebase inited, realtime enabled'); }
+        catch(e){ console.warn('Firebase init failed, fallback to localStorage', e); useFirestore=false; }
+      }
+      if(!useFirestore && !localStorage.getItem('masjid_site')) localStorage.setItem('masjid_site', JSON.stringify(demoData));
+      renderAll();
+      const io = new IntersectionObserver((entries)=>{ entries.forEach(en=>{if(en.isIntersecting) en.target.classList.add('in-view');}); },{threshold:.12});
+      document.querySelectorAll('.fade-in').forEach(el=>io.observe(el));
+      document.getElementById('year').textContent = new Date().getFullYear();
+      document.getElementById('donateNow').addEventListener('click', ()=>{ const amt = document.getElementById('donationAmount').value || '0'; alert('Terima kasih! Permintaan donasi: Rp ' + amt + " (demo)"); });
+    })();
+
+    /* ================ Guidance: Server (Node.js + Socket.io) ================
+    Berikut contoh server minimal yang bisa dipakai untuk menyimpan data dan mengirim update realtime ke klien.
+
+    // server/index.js (Node.js + Express + Socket.io)
+    const express = require('express');
+    const http = require('http');
+    const { Server } = require('socket.io');
+    const app = express();
+    const server = http.createServer(app);
+    const io = new Server(server, { cors:{ origin: '*' } });
+    app.use(express.json());
+    // simpan data di memory (untuk production gunakan DB seperti MongoDB / Postgres)
+    let siteData = {};
+    app.get('/site', (req,res)=> res.json(siteData));
+    app.post('/site', (req,res)=>{ siteData = req.body; io.emit('siteUpdated', siteData); res.json({ok:true}); });
+    io.on('connection', socket=>{ console.log('socket connected'); socket.emit('siteUpdated', siteData); });
+    server.listen(3000, ()=> console.log('listening 3000'));
+
+    Cara kerjanya di frontend: buka koneksi socket.io, listen ke event 'siteUpdated' dan render data yang dikirim.
+
+    Untuk deploy: gunakan Railway/Render/Heroku untuk server, dan Netlify/Vercel untuk frontend. Jika ingin autentikasi DKM, gunakan Firebase Auth atau buat endpoint login yang mengeluarkan JWT.
+
+    =======================================================================*/
+
+  </script>
+
+<!-- Firebase Storage Upload -->
+<script>
+// === Firebase Storage Upload ===
+let storage;
+
+function initStorage(){
+  if(!useFirestore) return;
+  storage = firebase.storage();
+}
+initStorage();
+
+// Tambahkan input upload
+const galInput = document.getElementById('inpGallery');
+
+// Buat tombol upload
+const uploadBtn = document.createElement('input');
+uploadBtn.type = 'file';
+uploadBtn.accept = 'image/*';
+uploadBtn.multiple = true;
+uploadBtn.style.marginTop = '8px';
+
+galInput.insertAdjacentElement('afterend', uploadBtn);
+
+uploadBtn.addEventListener('change', async (e)=>{
+  const files = Array.from(e.target.files);
+  if(!files.length) return;
+  if(!storage){ alert('Firebase Storage belum aktif'); return; }
+
+  const urls = [];
+  for(const file of files){
+    const ref = storage.ref('galeri/' + Date.now() + '_' + file.name);
+    await ref.put(file);
+    const url = await ref.getDownloadURL();
+    urls.push(url);
+  }
+
+  galInput.value += (galInput.value ? '
+' : '') + urls.join('
+');
+  alert(files.length + ' foto berhasil di-upload');
+});
+</script>
+</body>
+</html>
 
